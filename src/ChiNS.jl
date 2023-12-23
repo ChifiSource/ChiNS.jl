@@ -1,6 +1,5 @@
 module ChiNS
 using Toolips
-
 using ToolipsUDP
 
 mutable struct DNSFlags
@@ -10,6 +9,7 @@ mutable struct DNSFlags
     TC::Bool
     RD::Bool
     RA::Bool
+    Z::String
     RCOD::Int64
 end
 
@@ -28,9 +28,17 @@ mutable struct DNSResponse
     answer::Any
 end
 
+function build_flags(data::String)
+    bits::String = join([bitstring(s) for s in Vector{UInt8}(data)])
+    DNSFlags(parse(Bool, bits[1]), parse(Int64, bits[2:5]), parse(Bool, bits[6]), parse(Bool, bits[7]), parse(Bool, bits[8]),
+    parse(Bool, bits[9]), String(bits[10:12]), parse(Int64, bits[13:16]))::DNSFlags
+end
+
 function build_response(data::String)
     tid = data[1:2]
-    println(tid)
+    println("Transaction ID: ", tid)
+    flags::DNSFlags = build_flags(data[3:5])
+    println(flags)
 end
 
 function handler(c::UDPConnection)
