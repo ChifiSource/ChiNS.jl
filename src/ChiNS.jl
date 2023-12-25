@@ -43,17 +43,31 @@ end
 global qdata = ""
 
 function get_question(data::String)
-    current_len = Int64(UInt8(data[1]))
-    println(current_len)
-    println(data[2:current_len + 1])
-    lastlen::Int64 = 2
+    current_len = 0
+    current::String = ""
     parts = Vector{String}()
-    for x in 1:2
-        push!(parts, data[lastlen:current_len + 1])
-        lastlen = current_len
-        newb = data[lastlen + current_len + 2]
-        println(newb)
+    global qdata = data
+    count = 0
+    state = false
+    for byte in data
+        if state
+            current = current * byte
+            count += 1
+            if count == current_len
+                push!(parts, current)
+                current = ""
+                state = false
+                count = 0
+            end
+            if Int64(UInt8(byte)) == 0
+                break
+            end
+        else
+            state = true
+            current_len = Int64(UInt8(byte))
+        end
     end
+    println(parts)
 end
 
 function build_response(data::String)
