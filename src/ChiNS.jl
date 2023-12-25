@@ -34,11 +34,36 @@ function build_flags(data::String)
     parse(Bool, bits[9]), String(bits[10:12]), parse(Int64, bits[13:16]))::DNSFlags
 end
 
+function build_header(id::String, flags::DNSFlags, data::String = s)
+    QDCOUNT = "01"
+    println(data)
+    nothing
+end
+
+global qdata = ""
+
+function get_question(data::String)
+    current_len = Int64(UInt8(data[1]))
+    println(current_len)
+    println(data[2:current_len + 1])
+    lastlen::Int64 = 2
+    parts = Vector{String}()
+    for x in 1:2
+        push!(parts, data[lastlen:current_len + 1])
+        lastlen = current_len
+        newb = data[lastlen + current_len + 2]
+        println(newb)
+    end
+end
+
 function build_response(data::String)
     tid = data[1:2]
-    println("Transaction ID: ", tid)
-    flags::DNSFlags = build_flags(data[3:5])
-    println(flags)
+    flags::DNSFlags = build_flags(data[3:4])
+    try
+        name = get_question(data[13:length(data)])
+    catch e
+        Base.show(e)
+    end
 end
 
 function handler(c::UDPConnection)
