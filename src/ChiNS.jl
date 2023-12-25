@@ -1,6 +1,20 @@
 module ChiNS
 using Toolips
 using ToolipsUDP
+using JSON
+import ToolipsUDP: onstart
+
+ZONE_DIR::String = "zones"
+
+onstart(c::Dict{Symbol, Any}, E::ToolipsUDP.UDPExtension{:zones}) = begin
+    fs = filter!(fname -> contains(fname, ".zone"), readdir(ZONE_DIR))
+    zones = Dict{String, Any}(begin
+        fnamesplits = split(f, ".")
+        domain = join(fnamesplits[1:length(fnamesplits) - 1], ".")
+        string(domain) => JSON.parse(read(ZONE_DIR * "/" * f, String))
+    end for f in fs)
+    push!(c, :zones => zones)
+end
 
 mutable struct DNSFlags
     QR::Bool
@@ -40,16 +54,16 @@ function build_header(id::String, flags::DNSFlags, data::String = s)
     nothing
 end
 
-global qdata = ""
-
 function get_question(data::String)
     current_len = 0
     current::String = ""
     parts = Vector{String}()
     global qdata = data
     count = 0
+    indcount = 0
     state = false
     for byte in data
+        indcount += 1
         if state
             current = current * byte
             count += 1
@@ -67,24 +81,28 @@ function get_question(data::String)
             current_len = Int64(UInt8(byte))
         end
     end
-    println(parts)
+    return(parts, data[indcount + 2:indcount + 3])
 end
 
 function build_response(data::String)
     tid = data[1:2]
     flags::DNSFlags = build_flags(data[3:4])
-    try
-        name = get_question(data[13:length(data)])
-    catch e
-        Base.show(e)
+    name, type  = get_question(data[13:length(data)])
+    d = Vector{UInt8}(type)
+    questiontype = [Int64(pg) for pg in d]
+    if questiontype[1] == 0 && questiontype[2] == 1
+        println(name)
     end
 end
 
 function handler(c::UDPConnection)
+    println(c.data)
     response = build_response(c.packet)
 end
 
-function start(ip::String = "127.0.0.1", port::Int64 = 53)
+function start(ip::String = "127.0.0.1", port::Int64 = 53; 
+    path::String = ZONE_DIR)
+    global ZONE_DIR = path
     myserver = UDPServer(handler, ip, port)
     myserver.start()
     myserver

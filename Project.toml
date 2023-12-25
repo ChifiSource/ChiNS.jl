@@ -4,6 +4,7 @@ authors = ["emmac <emmacboudreau@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Toolips = "a47e2ad8-fcf7-417c-9746-32b9bdf220bd"
 ToolipsUDP = "c24f5779-9d3b-4059-90d7-a34104ea6889"
