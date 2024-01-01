@@ -3,6 +3,7 @@ using Toolips
 using ToolipsUDP
 using JSON
 import ToolipsUDP: onstart
+import Toolips: string
 
 ZONE_DIR::String = "zones"
 
@@ -18,22 +19,41 @@ end
 
 mutable struct DNSFlags
     QR::Bool
-    opcode::Int64
+    opcode::String
     AA::Bool
     TC::Bool
     RD::Bool
     RA::Bool
     Z::String
-    RCOD::Int64
+    RCOD::String
+end
+
+function string(flags::DNSFlags)
+    QR, opcode, AA, TC, RD = Int64(flags.QR), flags.opcode, Int64(flags.AA), Int64(flags.TC), Int64(flags.RD)
+    RA, Z, RCOD = Int64(flags.RA), flags.Z, flags.RCOD
+    byte1 =  parse(UInt8, "$(QR)000$AA$TC$RD", base = 2)
+    byte2 = parse(UInt8, "$RA$Z$RCOD", base = 2)
+    println(byte1, byte2)
+    "$byte1$byte2"
 end
 
 mutable struct DNSHeader
     ID::String
     flags::DNSFlags
-    QDCOUNT::String
-    ANCOUNT::String
-    NSCOUNT::String
-    ARCOUNT::String
+    QDCOUNT::UInt16
+    ANCOUNT::UInt16
+    NSCOUNT::UInt16
+    ARCOUNT::UInt16
+end
+
+function string(header::DNSHeader)
+    ID, flags = header.ID, header.flags
+    bytes = Vector{UInt8}()
+    [begin
+        bs = bitstring(field)
+        bytes = vcat(bytes, [parse(UInt8, bs[1:8], base = 2), parse(UInt8, bs[9:16], base = 2)])
+    end for field in [header.QDCOUNT, header.ANCOUNT, header.NSCOUNT, header.ARCOUNT]]
+    "$ID$(string(flags))$(String(bytes))"
 end
 
 mutable struct DNSResponse
@@ -44,14 +64,8 @@ end
 
 function build_flags(data::String)
     bits::String = join([bitstring(s) for s in Vector{UInt8}(data)])
-    DNSFlags(parse(Bool, bits[1]), parse(Int64, bits[2:5]), parse(Bool, bits[6]), parse(Bool, bits[7]), parse(Bool, bits[8]),
-    parse(Bool, bits[9]), String(bits[10:12]), parse(Int64, bits[13:16]))::DNSFlags
-end
-
-function build_header(id::String, flags::DNSFlags, data::String = s)
-    QDCOUNT = "01"
-    println(data)
-    nothing
+    DNSFlags(parse(Bool, bits[1]), bits[2:5], parse(Bool, bits[6]), parse(Bool, bits[7]), parse(Bool, bits[8]),
+    parse(Bool, bits[9]), String(bits[10:12]), bits[13:16])::DNSFlags
 end
 
 function get_question(data::String)
@@ -84,20 +98,31 @@ function get_question(data::String)
     return(parts, data[indcount + 2:indcount + 3])
 end
 
-function build_response(data::String)
+flags = nothing
+function build_response(c::UDPConnection, data::String)
     tid = data[1:2]
-    flags::DNSFlags = build_flags(data[3:4])
+    global flags = build_flags(data[3:4])
     name, type  = get_question(data[13:length(data)])
     d = Vector{UInt8}(type)
     questiontype = [Int64(pg) for pg in d]
+    qt::String = ""
     if questiontype[1] == 0 && questiontype[2] == 1
-        println(name)
+        qt = "a"
     end
+    zone = c[:zones][join(name, ".")]
+    qcount = UInt16(1)
+    ancount = UInt16(length(zone[qt]))
+    nscount = UInt16(1)
+    arcount = UInt16(1)
+    header = DNSHeader(tid, flags, qcount, ancount, nscount, arcount)
+    string(header)
 end
 
 function handler(c::UDPConnection)
-    println(c.data)
-    response = build_response(c.packet)
+    response = build_response(c, c.packet)
+    println(length(response))
+    respond(c, response)
+    return
 end
 
 function start(ip::String = "127.0.0.1", port::Int64 = 53; 
