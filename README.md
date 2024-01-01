@@ -3,6 +3,18 @@
 </div>
 
 ###### chifi name server
-`ChiNS` is a [toolips](https://github.com/ChifiSource/Toolips.jl)-powered UDP DNS server for Julia. 
+`ChiNS` is a [toolips](https://github.com/ChifiSource/Toolips.jl)-powered UDP DNS server for julia.
+##### map
+- [setup]()
+  - [adding chiNS]()
+  - [zone directory]()
+- [zones]()
+  - [zone editor]()
+  - [load balancing]()
 
-- this project is an **infant** <3
+#### setup
+###### adding chiNS
+###### zone directory
+#### zones
+###### zone editor
+###### load balancing
