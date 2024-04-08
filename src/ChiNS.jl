@@ -31,7 +31,6 @@ end
 function string(flags::DNSFlags)
     QR, opcode, AA, TC, RD = Int64(flags.QR), flags.opcode, Int64(flags.AA), Int64(flags.TC), Int64(flags.RD)
     RA, Z, RCOD = Int64(flags.RA), flags.Z, flags.RCOD
-  #  [print("$field: ", getfield(flags, field), " ") for field in fieldnames(DNSFlags)]
     byte1 =  parse(UInt8, "$(QR)$(flags.opcode)$AA$TC", base = 2)
     byte2 = parse(UInt8, "$RD$RA$Z$RCOD", base = 2)
     String([byte1, byte2])
@@ -167,6 +166,63 @@ end
 
 function add_zone()
 
+end
+
+function save_zone(d::Dict{String, <:Any})
+
+end
+
+function list_zones()
+    [begin
+        zonedata = JSON.parse(read(ZONE_DIR * "/" * zone_fname, String))
+        @info "zone $(zonedata["\$origin"])"
+        println("""
+        ~
+        ns: $(zonedata["ns"][1]["host"])
+        ns2: $(zonedata["ns"][2]["host"])
+        refresh: $(zonedata["soa"]["refresh"])
+        retry: $(zonedata["soa"]["retry"])
+        ip: $(zonedata["a"][2]["value"])
+        ~
+        """)
+    end for zone_fname in readdir(ZONE_DIR)]
+    nothing
+end
+
+function get_zone(name::String)
+    JSON.parse(read(ZONE_DIR * "/" * "$name.zone", String))::Dict{String, <:Any}
+end
+
+function remove_zone(name::String)
+    rm(ZONE_DIR * "/" * "$name.zone")
+end
+
+function add_zone(host::String, name::String, nss::String ...)
+    dir = ZONE_DIR * "/" * "$name.zone"
+    touch(dir)
+    open(dir, "w") do o
+        write(o, """{
+            "\$origin": "$name,
+            "\$ttl": 3600,
+            "soa": {
+                "mname": "ns1.chifi.c",
+                "rname": "admin.chifi.c",
+                "serial": "{time}",
+                "refresh": 3600,
+                "retry": 600,
+                "expire": 604800,
+                "minimum": 86400
+            },
+            "ns": [
+                {"host": "ns1.chifi.c"},
+                {"host": "ns2.chifi.c"}
+            ],
+            "a": [
+                {"name": "@", "ttl": 400, "value": "255.255.255.255"},
+                {"name": "@", "ttl": 400, "value": "127.0.0.1"},
+                {"name": "@", "ttl": 400, "value": "127.0.0.1"}
+            ]
+        }""")
 end
 
 function save_zone(d::Dict{String, <:Any})
