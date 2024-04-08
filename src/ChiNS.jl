@@ -1,20 +1,22 @@
 module ChiNS
-using Toolips
 using ToolipsUDP
 using JSON
-import ToolipsUDP: onstart
+import ToolipsUDP: on_start
 import Toolips: string
 SRCDIR = @__DIR__
 ZONE_DIR::String = "$SRCDIR/../zones"
 
-onstart(c::Dict{Symbol, Any}, E::ToolipsUDP.UDPExtension{:zones}) = begin
+function read_zones()
     fs = filter!(fname -> contains(fname, ".zone"), readdir(ZONE_DIR))
-    zones = Dict{String, Any}(begin
+    Dict{String, Any}(begin
         fnamesplits = split(f, ".")
         domain = join(fnamesplits[1:length(fnamesplits) - 1], ".")
         string(domain) => JSON.parse(read(ZONE_DIR * "/" * f, String))
-    end for f in fs)
-    push!(c, :zones => zones)
+    end for f in fs)::Dict{String, Any}
+end
+
+on_start(c::Dict{Symbol, Any}, E::ToolipsUDP.UDPExtension{:zones}) = begin
+    push!(c, :zones => read_zones())
 end
 
 mutable struct DNSFlags
@@ -125,21 +127,18 @@ function build_response(c::UDPConnection, data::String)
     string(header)
 end
 
-function handler(c::UDPConnection)
+main_handler = handler() do c::UDPConnection
     response = build_response(c, c.packet)
     println(length(response))
-    respond(c, response)
+    respond!(c, response)
     return
 end
 
-function start(ip::String = "127.0.0.1", port::Int64 = 53; 
+function start(ip::IP4 = "127.0.0.1":53; 
     path::String = ZONE_DIR)
     global ZONE_DIR = path
-    myserver = UDPServer(handler, ip, port)
-    myserver.start()
-    myserver
+    ToolipsUDP.start!(ChiNS, ip)
 end
-
 
 function list_zones()
     [begin
@@ -166,37 +165,61 @@ function remove_zone(name::String)
     rm(ZONE_DIR * "/" * "$name.zone")
 end
 
-function add_zone(host::String, name::String, nss::String ...)
+function add_zone(host::String, name::String, to::String, 
+    nss::String ...; refresh::Int64 = 3600, retry::Int64 = 600, expire::Int64 = 604800, 
+    minimum::Int64 = 86400)
     dir = ZONE_DIR * "/" * "$name.zone"
     touch(dir)
+    nsns = join(("""{"host": "$ns"}""" for host in nss), ",\n")
     open(dir, "w") do o
         write(o, """{
             "\$origin": "$name,
             "\$ttl": 3600,
             "soa": {
-                "mname": "ns1.chifi.c",
-                "rname": "admin.chifi.c",
+                "mname": "$(nss[1]),
+                "rname": "admin.$(name)",
                 "serial": "{time}",
-                "refresh": 3600,
-                "retry": 600,
-                "expire": 604800,
-                "minimum": 86400
+                "refresh": $refresh,
+                "retry": $retry,
+                "expire": $expire,
+                "minimum": $minimum
             },
             "ns": [
-                {"host": "ns1.chifi.c"},
-                {"host": "ns2.chifi.c"}
+                $nsns
             ],
             "a": [
                 {"name": "@", "ttl": 400, "value": "255.255.255.255"},
-                {"name": "@", "ttl": 400, "value": "127.0.0.1"},
-                {"name": "@", "ttl": 400, "value": "127.0.0.1"}
+                {"name": "@", "ttl": 400, "value": "$to"},
+                {"name": "@", "ttl": 400, "value": "$to"}
             ]
         }""")
+    end
 end
 
 function save_zone(d::Dict{String, <:Any})
-
+    dir = ZONE_DIR * "/" * "$(d["origin"]).zone"
+    if ~(isfile(dir))
+        touch(dir)
+    end
+    open(dir, "w") do o::IO
+        JSON.print(o, d)
+    end
 end
 
+function save_zone(d::Dict{String, <:Any}, name::String)
+    dir = ZONE_DIR * "/" * "$name.zone"
+    if ~(isfile(dir))
+        touch(dir)
+    end
+    open(dir, "w") do o::IO
+        JSON.print(o, d)
+    end
+end
+
+reload() = ChiNS.data[:zones] = read_zones()
+
+zones_extension = UDPExtension{:zones}()
+
+export main_handler, zones_extension
 end # - module
         
