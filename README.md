@@ -1,6 +1,9 @@
 <div align="center">
 <img width="200" src="https://github.com/ChifiSource/image_dump/blob/main/chins/chifiNS.png"><img>
+<h6>chifi name server</h6>
+</br>
 </div>
+
 
 ###### chifi name server
 `ChiNS` is a [toolips](https://github.com/ChifiSource/Toolips.jl)-powered UDP DNS server for julia.

@@ -140,6 +140,37 @@ function start(ip::String = "127.0.0.1", port::Int64 = 53;
     myserver
 end
 
+function list_zones()
+    [begin
+        zonedata = JSON.parse(read(ZONE_DIR * "/" * zone_fname, String))
+        println("""---
+        URL: $(zonedata["\$origin"])
+        ~
+        ns: $(zonedata["ns"][1]["host"])
+        ns2: $(zonedata["ns"][2]["host"])
+        refresh: $(zonedata["soa"]["refresh"])
+        retry: $(zonedata["soa"]["retry"])
+        ip: $(zonedata["a"][2]["value"])
+        """)
+    end for zone_fname in readdir(ZONE_DIR)]
+    nothing
+end
+
+function get_zone()
+
+end
+
+function remove_zone()
+
+end
+
+function add_zone()
+
+end
+
+function save_zone(d::Dict{String, <:Any})
+
+end
 
 function list_zones()
     [begin
